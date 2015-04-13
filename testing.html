@@ -1,0 +1,96 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>BeScroll.js 模拟滚动插件</title>
+		<meta name="description" content="{{ motto }}" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="blue" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0, minimum-scale=1.0, maximum-scale=1.0">
+		<meta name="format-detection" content="telephone=no">
+		<style type="text/css">
+		body {
+			margin: 0;
+			padding: 0;
+		}
+		div {
+			height: 200px;
+			line-height: 200px;
+			text-align: center;
+			font-size: 40px;
+		}
+		.red {
+			background: red;
+		}
+		.green {
+			background: green;
+		}
+		.yellow {
+			background: yellow;
+		}
+		.pink {
+			background: pink;
+		}
+		.white {
+			background: white;
+		}
+		.blue {
+			background: blue;
+		}
+		</style>
+	</head>
+	<body>
+		<div class="red">1</div>
+		<div class="green">2</div>
+		<div class="yellow">3</div>
+		<div class="pink">4</div>
+		<div class="white">5</div>
+		<div class="blue">6</div>
+		<div class="red">7</div>
+		<div class="green">8</div>
+		<div class="yellow">9</div>
+		<div class="pink">10</div>
+		<div class="white">11</div>
+		<div class="blue">12</div>
+		<div class="red">13</div>
+		<div class="green">14</div>
+		<div class="yellow">15</div>
+		<div class="pink">16</div>
+		<div class="white">17</div>
+		<div class="blue">18</div>
+		<div class="red">19</div>
+		<div class="green">20</div>
+		<script type="text/javascript" src="js/BeScroll.js"></script>
+		<script type="text/javascript">
+			function IsPC() {
+			    var userAgentInfo = navigator.userAgent;
+			    var Agents = ["Android", "iPhone",
+			                "SymbianOS", "Windows Phone",
+			                "iPad", "iPod"];
+			    var flag = true;
+			    for (var v = 0; v < Agents.length; v++) {
+			        if (userAgentInfo.indexOf(Agents[v]) > 0) {
+			            flag = false;
+			            break;
+			        }
+			    }
+			    return flag;
+			}
+			if (!IsPC()) {
+				/* 仅支持在移动设备中使用 */
+				BeScroll.init({
+					slideRight: function() {
+						alert('右滑了哦');
+					},
+					slideLeft: function() {
+						alert('左滑了哦');
+					},
+					click: function(target) {
+						alert("div" + target.innerHTML + '：你点我干嘛？');
+					},
+					bescroll: true  //开启模拟滚动
+				});
+			}
+		</script>
+	</body>
+</html>
