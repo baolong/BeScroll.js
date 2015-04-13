@@ -9,6 +9,7 @@
   */
 var BeScroll = function() {
 	var datas = {
+		scroller: document.body,
 		x: 0,
 		y: 0,
 		moveY: 0,
@@ -18,6 +19,7 @@ var BeScroll = function() {
 		startTime : null,
 		slideSpeed: 0,  //滑动速度，
 		slideDreaction: 1,   //向下为1，向上为-1
+		scrollTarget: null,
 		request: null,
 		maxHeight: 0   //页面最大高度
 	}, _fn = {
@@ -43,37 +45,65 @@ var BeScroll = function() {
 		},
 		bescroll : function(y) {
 			/* 模拟滚动 */
-			var mt1 = parseInt(document.body.style.marginTop);
-			mt1 = mt1?mt1:0;
-			mt1 = mt1 + (y - datas.moveY);
-			if (mt1 < 0 && mt1 > -1*datas.maxHeight) {
-				document.body.style.marginTop = mt1 + "px";
+			if (datas.scrollTarget) {
+				datas.scrollTarget.scrollTop = parseInt(datas.scrollTarget.scrollTop) + (y - datas.moveY)*-1;
+			} else {
+				var mt1 = parseInt(datas.scroller.style.marginTop);
+				mt1 = mt1?mt1:0;
+				mt1 = mt1 + (y - datas.moveY);
+				if (mt1 < 0 && mt1 > -1*datas.maxHeight) {
+					datas.scroller.style.marginTop = mt1 + "px";
+				}
 			}
 			datas.moveY = y;
 		},
 		inertialGuidance : function() {
 			/* 惯性导航 */
 			//cancelAnimationFrame(datas.request);
-			var mt = parseInt(document.body.style.marginTop);
-			mt = mt?mt:0;
 			datas.slideSpeed -= 0.5;
-			mt += datas.slideSpeed*datas.slideDreaction;
-			if (mt < 0 && mt > -1*datas.maxHeight) {
-				document.body.style.marginTop = mt + "px";
-				if (datas.slideSpeed > 0) {
-					datas.request = window.requestAnimationFrame(_fn.inertialGuidance);
+			if (datas.scrollTarget) {
+				var st = datas.scrollTarget.scrollTop;
+				st = st?st:0;
+				st += datas.slideSpeed*datas.slideDreaction*-1;
+				if (st > 0 && st < datas.scrollTarget.scrollHeight) {
+					datas.scrollTarget.scrollTop = st;
+					if (datas.slideSpeed > 0) {
+						datas.request = window.requestAnimationFrame(_fn.inertialGuidance);
+					}
+				}
+			} else {
+				var mt = parseInt(datas.scroller.style.marginTop);
+				mt = mt?mt:0;
+				mt += datas.slideSpeed*datas.slideDreaction;
+				if (mt < 0 && mt > -1*datas.maxHeight) {
+					datas.scroller.style.marginTop = mt + "px";
+					if (datas.slideSpeed > 0) {
+						datas.request = window.requestAnimationFrame(_fn.inertialGuidance);
+					}
 				}
 			}
 		},
+		getScrollTarget : function(target) {
+			/* 获取滚动目标元素 */
+			do {
+				if (parseInt(target.clientHeight) < parseInt(target.scrollHeight)  && target != datas.scroller && target != document.documentElement) {
+					datas.scrollTarget = target;
+					break;
+				}
+				datas.scrollTarget = null;
+				target = target.parentElement;
+			}while(target);
+		},
 		touchstart : function(event) {
 			if (datas.preventDefault) { event.preventDefault(); }
-			datas.maxHeight = parseInt(document.body.clientHeight) - parseInt(document.documentElement.clientHeight);
+			datas.maxHeight = parseInt(datas.scroller.clientHeight) - parseInt(datas.scroller.parentElement.clientHeight);
 			var d = new Date();
 			datas.startTime = d.getMilliseconds();  //获取滑动开始时间
 			touchesstart  = event.changedTouches || event.originalEvent.touches || event.originalEvent.changedTouches;
 			datas.x = touchesstart[0].pageX;
 			datas.y = touchesstart[0].pageY;
 			datas.moveY = datas.y;
+			_fn.getScrollTarget(event.target);
 		},
 		touchmove : function(event) {
 			if (datas.preventDefault) { event.preventDefault(); }
@@ -89,9 +119,6 @@ var BeScroll = function() {
 				y1 = parseInt(touchesend[0].pageY),
 				distanceX = x1 - datas.x,
 				distanceY = y1 - datas.y;
-			datas.slideDreaction = distanceY > 0 ? 1 : -1;   //判断滚动方向，上or下
-			datas.slideSpeed = Math.round(17*distanceY/(endTime - datas.startTime));  //计算手指滑动速度，单位：px/17ms
-			datas.slideSpeed = Math.abs(datas.slideSpeed);   //取绝对值
 			if (distanceX >= 100) {  //右滑
 				_fn.slideRight && _fn.slideRight();
 			} else if (distanceX <= -100) {   //左滑
@@ -101,9 +128,12 @@ var BeScroll = function() {
 			} else if (distanceY <= -100) {   //上滑
 				_fn.slideUp && _fn.slideUp();
 			}
+			datas.slideDreaction = distanceY > 0 ? 1 : -1;   //判断滚动方向，上or下
+			datas.slideSpeed = Math.round(17*distanceY/(endTime - datas.startTime));  //计算手指滑动速度，单位：px/17ms
+			datas.slideSpeed = Math.abs(datas.slideSpeed);   //取绝对值
 			if (Math.abs(distanceY) < 10 && Math.abs(distanceX) < 10) {
 				event.target.click();
-				_fn.click && _fn.click(event.target);
+				_fn.click && _fn.click(event);
 			}
 			//if (distanceY <= 300 && distanceY >= -300) {
 			if (datas.bescroll) {
@@ -113,11 +143,9 @@ var BeScroll = function() {
 			datas.x = datas.y = 0;
 		}
 	}, _init = function(params) {
-		document.documentElement.style.overflow = 'hidden';
-		document.documentElement.style.width = '100%';
 		if (params) {
 			/* 初始化用户事件 start */
-			params.bescroll ? datas.bescroll = params.bescroll : null;
+			datas.bescroll = params.bescroll ? params.bescroll : null;
 			(params.slideUp && typeof(params.slideUp) == 'function') ? _fn.slideUp = params.slideUp : null;
 			(params.slideDown && typeof(params.slideDown) == 'function') ? _fn.slideDown = params.slideDown : null;
 			(params.slideLeft && typeof(params.slideLeft) == 'function') ? _fn.slideLeft = params.slideLeft : null;
@@ -125,6 +153,10 @@ var BeScroll = function() {
 			(params.click && typeof(params.click) == 'function') ? _fn.click = params.click : null;
 			/* 初始化用户事件 end */
 		}
+		datas.scroller.parentElement.style.overflow = 'hidden';
+		datas.scroller.parentElement.style.width = '100%';
+		datas.scroller.parentElement.style.height = '100%';
+		datas.scroller.parentElement.style.position = 'relative';
 		_fn.initRAF();
 		document.addEventListener('touchstart', _fn.touchstart);
 		document.addEventListener('touchmove', _fn.touchmove);
