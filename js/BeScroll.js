@@ -1,6 +1,8 @@
 /**
   * 参数：
   *		bescroll: 是否开启模拟滚动，默认：false
+  *		scrollBar: 是否打开滚动条，默认：true
+  *		barColor: 滚动条颜色，默认：#ccc
   *		sideUp(): 手指上滑处理事件
   *		sideDown(): 手指下滑处理事件
   *		sideLeft():  手指左滑处理事件
@@ -16,11 +18,17 @@ var BeScroll = function() {
 		hands: 0,
 		preventDefault: true,
 		bescroll: false,
+		scrollBar: true,
+		barColor: '#aaa',
+		curTop: 0, //滚动条当前位置的高度
+		maxTop: 0,  //滚动条位置的最大高度
 		startTime : null,
 		slideSpeed: 0,  //滑动速度，
 		slideDreaction: 1,   //向下为1，向上为-1
 		scrollTarget: null,
 		request: null,
+		scrollerHeight: 0,
+		parentHeight: 0,
 		maxHeight: 0   //页面最大高度
 	}, _fn = {
 		initRAF : function() {
@@ -48,11 +56,12 @@ var BeScroll = function() {
 			if (datas.scrollTarget) {
 				datas.scrollTarget.scrollTop = parseInt(datas.scrollTarget.scrollTop) + (y - datas.moveY)*-1;
 			} else {
-				var mt1 = parseInt(datas.scroller.style.marginTop);
-				mt1 = mt1?mt1:0;
-				mt1 = mt1 + (y - datas.moveY);
-				if (mt1 < 0 && mt1 > -1*datas.maxHeight) {
-					datas.scroller.style.marginTop = mt1 + "px";
+				var marginTop = parseInt(datas.scroller.style.marginTop);
+				marginTop = marginTop?marginTop:0;
+				marginTop = marginTop + (y - datas.moveY);
+				if (marginTop < 0 && marginTop > -1*datas.maxHeight) {
+					datas.scroller.style.marginTop = marginTop + "px";
+					datas.scrollBar.style.top = (-1*datas.parentHeight*marginTop/datas.scrollerHeight) + 'px';
 				}
 			}
 			datas.moveY = y;
@@ -72,11 +81,12 @@ var BeScroll = function() {
 					}
 				}
 			} else {
-				var mt = parseInt(datas.scroller.style.marginTop);
-				mt = mt?mt:0;
-				mt += datas.slideSpeed*datas.slideDreaction;
-				if (mt < 0 && mt > -1*datas.maxHeight) {
-					datas.scroller.style.marginTop = mt + "px";
+				var marginTop = parseInt(datas.scroller.style.marginTop);
+				marginTop = marginTop?marginTop:0;
+				marginTop += datas.slideSpeed*datas.slideDreaction;
+				if (marginTop < 0 && marginTop > -1*datas.maxHeight) {
+					datas.scroller.style.marginTop = marginTop + "px";
+					datas.scrollBar.style.top = (-1*datas.parentHeight*marginTop/datas.scrollerHeight) + 'px';
 					if (datas.slideSpeed > 0) {
 						datas.request = window.requestAnimationFrame(_fn.inertialGuidance);
 					}
@@ -141,11 +151,42 @@ var BeScroll = function() {
 			}
 			//}
 			datas.x = datas.y = 0;
+		},
+		initScrollBar : function() {
+			if (datas.scrollBar) {
+				datas.scrollBar = document.createElement('div');
+				document.addEventListener("DOMNodeInserted", function (ev) {
+						datas.parentHeight = parseInt(datas.scroller.parentElement.clientHeight);
+						datas.scrollerHeight = parseInt(datas.scroller.clientHeight);
+						var scrollHeight = datas.parentHeight*datas.parentHeight/datas.scrollerHeight;
+						if (scrollHeight < datas.parentHeight) {
+								style = {
+									width: '5px',
+									height: scrollHeight + 'px',
+									background: datas.barColor,
+									position: 'fixed',
+									right: '0',
+									top: '0'
+								};
+							datas.scrollBar.setAttribute('class', 'BeScroll-scrollBar');
+							for (var s in style) {
+								datas.scrollBar.style[s] = style[s];
+							}
+							datas.scrollBar.style.display = 'block';
+						} else {
+							datas.scrollBar.style.display = 'none';
+						}
+				}, false);
+				datas.scrollBar.innerHTML = ' ';
+				document.body.appendChild(datas.scrollBar);
+			}
 		}
 	}, _init = function(params) {
 		if (params) {
 			/* 初始化用户事件 start */
 			datas.bescroll = params.bescroll ? params.bescroll : null;
+			datas.scrollBar = params.scrollBar ? params.scrollBar : true;
+			datas.barColor = params.barColor ? params.barColor : datas.barColor;
 			(params.slideUp && typeof(params.slideUp) == 'function') ? _fn.slideUp = params.slideUp : null;
 			(params.slideDown && typeof(params.slideDown) == 'function') ? _fn.slideDown = params.slideDown : null;
 			(params.slideLeft && typeof(params.slideLeft) == 'function') ? _fn.slideLeft = params.slideLeft : null;
@@ -157,10 +198,16 @@ var BeScroll = function() {
 		datas.scroller.parentElement.style.width = '100%';
 		datas.scroller.parentElement.style.height = '100%';
 		datas.scroller.parentElement.style.position = 'relative';
+		datas.scrollerHeight = parseInt(datas.scroller.clientHeight);
+		datas.parentHeight = parseInt(datas.scroller.parentElement.clientHeight);
+		datas.maxHeight = datas.scrollerHeight - datas.parentHeight;
 		_fn.initRAF();
 		document.addEventListener('touchstart', _fn.touchstart);
 		document.addEventListener('touchmove', _fn.touchmove);
 		document.addEventListener('touchend', _fn.touchend);
+		/* 初始化滚动条 start */
+		_fn.initScrollBar();
+		/* 初始化滚动条 end */
 	};
 	return {
 		fn: _fn,
