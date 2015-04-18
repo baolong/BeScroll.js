@@ -2,7 +2,7 @@
   * 参数：
   *		bescroll: 是否开启模拟滚动，默认：false
   *		scrollBar: 是否打开滚动条，默认：true
-  *		barColor: 滚动条颜色，默认：#ccc
+  *		barColor: 滚动条颜色，默认：#ff8200
   *		sideUp(): 手指上滑处理事件
   *		sideDown(): 手指下滑处理事件
   *		sideLeft():  手指左滑处理事件
@@ -12,24 +12,25 @@
 var BeScroll = function() {
 	var datas = {
 		scroller: document.body,
-		x: 0,
-		y: 0,
+		x: 0,    //touchstart的x坐标
+		y: 0,    //touchstart的y坐标
 		moveY: 0,
-		hands: 0,
+		hands: 0,  //手指数
 		preventDefault: true,
-		bescroll: false,
-		scrollBar: true,
-		barColor: '#aaa',
+		bescroll: false,   //是否开启模拟滚动
+		scrollBar: true,   //是否开启滚动条
+		barColor: '#ff8200',   //滚动条颜色
 		curTop: 0, //滚动条当前位置的高度
 		maxTop: 0,  //滚动条位置的最大高度
-		startTime : null,
+		startTime : null,    //滑动的开始时间，stouchstart的时间
 		slideSpeed: 0,  //滑动速度，
 		slideDreaction: 1,   //向下为1，向上为-1
-		scrollTarget: null,
-		request: null,
+		scrollTarget: null,   //滚动目标元素
+		request: null,    //requestAnimationFrame 对象
 		scrollerHeight: 0,
 		parentHeight: 0,
-		maxHeight: 0   //页面最大高度
+		maxHeight: 0,   //页面最大高度
+		lock: false   //初始化滚动条的互斥锁
 	}, _fn = {
 		initRAF : function() {
 			/* 功能：初始化requestAnimationFrame 
@@ -155,18 +156,22 @@ var BeScroll = function() {
 		initScrollBar : function() {
 			if (datas.scrollBar) {
 				datas.scrollBar = document.createElement('div');
-				document.addEventListener("DOMNodeInserted", function (ev) {
+				document.getElementById('content').addEventListener("DOMNodeInserted", function (ev) {
+					if (!datas.lock) {
+						datas.lock = true;
 						datas.parentHeight = parseInt(datas.scroller.parentElement.clientHeight);
 						datas.scrollerHeight = parseInt(datas.scroller.clientHeight);
+						datas.lock = false;
 						var scrollHeight = datas.parentHeight*datas.parentHeight/datas.scrollerHeight;
 						if (scrollHeight < datas.parentHeight) {
-								style = {
+							var style = {
 									width: '5px',
 									height: scrollHeight + 'px',
 									background: datas.barColor,
 									position: 'fixed',
 									right: '0',
-									top: '0'
+									top: '0',
+									'z-index': 99999
 								};
 							datas.scrollBar.setAttribute('class', 'BeScroll-scrollBar');
 							for (var s in style) {
@@ -176,7 +181,8 @@ var BeScroll = function() {
 						} else {
 							datas.scrollBar.style.display = 'none';
 						}
-				}, false);
+					}
+				}, true);
 				datas.scrollBar.innerHTML = ' ';
 				document.body.appendChild(datas.scrollBar);
 			}
