@@ -7,7 +7,8 @@
   *		sideDown(): 手指下滑处理事件
   *		sideLeft():  手指左滑处理事件
   *		sideRight(): 手指右滑处理事件
-  *		click(event): 屏幕点击事件
+  *		click(target): 屏幕点击事件
+  *		longClick(target):  长按事件
   */
 var BeScroll = function() {
 	var datas = {
@@ -30,7 +31,8 @@ var BeScroll = function() {
 		scrollerHeight: 0,
 		parentHeight: 0,
 		maxHeight: 0,   //页面最大高度
-		lock: false   //初始化滚动条的互斥锁
+		lock: false,   //初始化滚动条的互斥锁
+		hands: 0
 	}, _fn = {
 		initRAF : function() {
 			/* 功能：初始化requestAnimationFrame 
@@ -109,7 +111,7 @@ var BeScroll = function() {
 			if (datas.preventDefault) { event.preventDefault(); }
 			datas.maxHeight = parseInt(datas.scroller.clientHeight) - parseInt(datas.scroller.parentElement.clientHeight);
 			var d = new Date();
-			datas.startTime = d.getMilliseconds();  //获取滑动开始时间
+			datas.startTime = d.getTime();  //获取滑动开始时间
 			touchesstart  = event.changedTouches || event.originalEvent.touches || event.originalEvent.changedTouches;
 			datas.x = touchesstart[0].pageX;
 			datas.y = touchesstart[0].pageY;
@@ -119,12 +121,15 @@ var BeScroll = function() {
 		touchmove : function(event) {
 			if (datas.preventDefault) { event.preventDefault(); }
 			touches  = event.changedTouches || event.originalEvent.touches || event.originalEvent.changedTouches;
-			datas.bescroll ? _fn.bescroll(touches[0].pageY) : null;  //若开启了模拟滚动则执行模拟滚动
+			datas.hands = touches.length;
+			if (datas.hands == 1) {
+				datas.bescroll ? _fn.bescroll(touches[0].pageY) : null;  //若开启了模拟滚动则执行模拟滚动
+			}
 		},
 		touchend : function(event) {
 			if (datas.preventDefault) { event.preventDefault(); }
 			var d = new Date();
-			var endTime = d.getMilliseconds(), //滑动结束时间
+			var endTime = d.getTime(), //滑动结束时间
 				touchesend  = event.changedTouches || event.originalEvent.touches || event.originalEvent.changedTouches;
 			var x1 = parseInt(touchesend[0].pageX),
 				y1 = parseInt(touchesend[0].pageY),
@@ -143,61 +148,61 @@ var BeScroll = function() {
 			datas.slideSpeed = Math.round(17*distanceY/(endTime - datas.startTime));  //计算手指滑动速度，单位：px/17ms
 			datas.slideSpeed = Math.abs(datas.slideSpeed);   //取绝对值
 			if (Math.abs(distanceY) < 10 && Math.abs(distanceX) < 10) {
-				event.target.click();
-				_fn.click && _fn.click(event);
+				if (endTime - datas.startTime >= 700) {
+					_fn.longClick && _fn.longClick(event.target);
+				} else {
+					event.target.click();
+					_fn.click && _fn.click(event.target);
+				}
 			}
-			//if (distanceY <= 300 && distanceY >= -300) {
 			if (datas.bescroll) {
 				datas.request = window.requestAnimationFrame(_fn.inertialGuidance);
 			}
-			//}
 			datas.x = datas.y = 0;
 		},
 		initScrollBar : function() {
-			if (datas.scrollBar) {
-				datas.scrollBar = document.createElement('div');
-				document.getElementById('content').addEventListener("DOMNodeInserted", function (ev) {
-					if (!datas.lock) {
-						datas.lock = true;
-						datas.parentHeight = parseInt(datas.scroller.parentElement.clientHeight);
-						datas.scrollerHeight = parseInt(datas.scroller.clientHeight);
-						datas.lock = false;
-						var scrollHeight = datas.parentHeight*datas.parentHeight/datas.scrollerHeight;
-						if (scrollHeight < datas.parentHeight) {
-							var style = {
-									width: '5px',
-									height: scrollHeight + 'px',
-									background: datas.barColor,
-									position: 'fixed',
-									right: '0',
-									top: '0',
-									'z-index': 99999
-								};
-							datas.scrollBar.setAttribute('class', 'BeScroll-scrollBar');
-							for (var s in style) {
-								datas.scrollBar.style[s] = style[s];
-							}
-							datas.scrollBar.style.display = 'block';
-						} else {
-							datas.scrollBar.style.display = 'none';
-						}
+			//初始化初始化
+			if (!datas.lock) {
+				datas.lock = true;
+				datas.parentHeight = parseInt(datas.scroller.parentElement.clientHeight);
+				datas.scrollerHeight = parseInt(datas.scroller.clientHeight);
+				datas.lock = false;
+				var scrollHeight = datas.parentHeight*datas.parentHeight/datas.scrollerHeight;
+				if (scrollHeight < datas.parentHeight) {
+					var style = {
+							width: '5px',
+							height: scrollHeight + 'px',
+							background: datas.barColor,
+							position: 'fixed',
+							right: '0',
+							top: '0',
+							'z-index': 99999
+						};
+					datas.scrollBar.setAttribute('class', 'BeScroll-scrollBar');
+					for (var s in style) {
+						datas.scrollBar.style[s] = style[s];
 					}
-				}, true);
-				datas.scrollBar.innerHTML = ' ';
-				document.body.appendChild(datas.scrollBar);
+					datas.scrollBar.style.display = 'block';
+				} else {
+					datas.scrollBar.style.display = 'none';
+				}
 			}
 		}
+	}, _toTop = function() {
+		// 回到顶部
+		datas.scroller.style.marginTop = 0;
 	}, _init = function(params) {
 		if (params) {
 			/* 初始化用户事件 start */
 			datas.bescroll = params.bescroll ? params.bescroll : null;
 			datas.scrollBar = params.scrollBar ? params.scrollBar : true;
 			datas.barColor = params.barColor ? params.barColor : datas.barColor;
-			(params.slideUp && typeof(params.slideUp) == 'function') ? _fn.slideUp = params.slideUp : null;
-			(params.slideDown && typeof(params.slideDown) == 'function') ? _fn.slideDown = params.slideDown : null;
-			(params.slideLeft && typeof(params.slideLeft) == 'function') ? _fn.slideLeft = params.slideLeft : null;
-			(params.slideRight && typeof(params.slideRight) == 'function') ? _fn.slideRight = params.slideRight : null;
-			(params.click && typeof(params.click) == 'function') ? _fn.click = params.click : null;
+			(params.slideUp && typeof params.slideUp == 'function') ? _fn.slideUp = params.slideUp : null;
+			(params.slideDown && typeof params.slideDown == 'function') ? _fn.slideDown = params.slideDown : null;
+			(params.slideLeft && typeof params.slideLeft == 'function') ? _fn.slideLeft = params.slideLeft : null;
+			(params.slideRight && typeof params.slideRight == 'function') ? _fn.slideRight = params.slideRight : null;
+			(params.click && typeof params.click) == 'function' ? _fn.click = params.click : null;
+			(params.longClick && typeof params.longClick == 'function') ? _fn.longClick = params.longClick : null;
 			/* 初始化用户事件 end */
 		}
 		datas.scroller.parentElement.style.overflow = 'hidden';
@@ -212,11 +217,23 @@ var BeScroll = function() {
 		document.addEventListener('touchmove', _fn.touchmove);
 		document.addEventListener('touchend', _fn.touchend);
 		/* 初始化滚动条 start */
-		_fn.initScrollBar();
+		if (datas.scrollBar) {
+			datas.scrollBar = document.createElement('div');
+			/* 当页面内有变化，则重新初始化滚动条 start */
+			document.addEventListener("DOMNodeInserted", function (ev) {
+				_fn.initScrollBar();
+			}, true);
+			document.addEventListener("DOMNodeRemoved", function (ev) {
+				_fn.initScrollBar();
+			}, true);
+			/* 当页面内有变化，则重新初始化滚动条 end */
+			datas.scrollBar.innerHTML = ' ';
+			document.body.appendChild(datas.scrollBar);
+		}
 		/* 初始化滚动条 end */
 	};
 	return {
-		fn: _fn,
+		toTop: _toTop,
 		init: _init
 	};
 }();
