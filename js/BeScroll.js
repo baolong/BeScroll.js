@@ -9,6 +9,7 @@
   *		sideRight(): 手指右滑处理事件
   *		click(target): 屏幕点击事件
   *		longClick(target):  长按事件
+  *		toTop():   回到顶部，没有滚动动画
   */
 var BeScroll = function() {
 	var datas = {
