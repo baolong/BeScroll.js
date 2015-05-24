@@ -3,10 +3,16 @@
   *		bescroll: 是否开启模拟滚动，默认：false
   *		scrollBar: 是否打开滚动条，默认：true
   *		barColor: 滚动条颜色，默认：#ff8200
-  *		sideUp(): 手指上滑处理事件
-  *		sideDown(): 手指下滑处理事件
-  *		sideLeft():  手指左滑处理事件
-  *		sideRight(): 手指右滑处理事件
+  *		slideUp(): 手指上滑处理事件
+  *		slideDown(): 手指下滑处理事件
+  *		slideLeft():  手指左滑处理事件
+  *		slideRight(): 手指右滑处理事件
+  *		touchMove(curX, curY, disX, disY):  手指滑动事件,参数：
+  *										curX：当前X坐标，
+  *										curY：当前Y坐标
+  *										disX: x轴位移
+  *										disY：y轴位移
+  *		noSlide(): 滑动取消事件，滑动位移不足，不触发上/下/左/右滑事件
   *		click(target): 屏幕点击事件
   *		longClick(target):  长按事件
   *		toTop():   回到顶部，没有滚动动画
@@ -16,6 +22,8 @@ var BeScroll = function() {
 		scroller: document.body,
 		x: 0,    //touchstart的x坐标
 		y: 0,    //touchstart的y坐标
+		mx: 0,    //touchmove的x坐标
+		my: 0,    //touchmove的xy坐标
 		moveY: 0,
 		hands: 0,  //手指数
 		preventDefault: true,
@@ -33,7 +41,8 @@ var BeScroll = function() {
 		parentHeight: 0,
 		maxHeight: 0,   //页面最大高度
 		lock: false,   //初始化滚动条的互斥锁
-		hands: 0
+		hands: 0,
+		isScrolling: false
 	}, _fn = {
 		initRAF : function() {
 			/* 功能：初始化requestAnimationFrame 
@@ -116,16 +125,30 @@ var BeScroll = function() {
 			touchesstart  = event.changedTouches || event.originalEvent.touches || event.originalEvent.changedTouches;
 			datas.x = touchesstart[0].pageX;
 			datas.y = touchesstart[0].pageY;
+			datas.mx = touchesstart[0].pageX;
+			datas.my = touchesstart[0].pageY;
 			datas.moveY = datas.y;
 			_fn.getScrollTarget(event.target);
 		},
 		touchmove : function(event) {
+			if (datas.isScrolling) return;
+			datas.isScrolling = true;
 			if (datas.preventDefault) { event.preventDefault(); }
 			touches  = event.changedTouches || event.originalEvent.touches || event.originalEvent.changedTouches;
 			datas.hands = touches.length;
 			if (datas.hands == 1) {
 				datas.bescroll ? _fn.bescroll(touches[0].pageY) : null;  //若开启了模拟滚动则执行模拟滚动
 			}
+			if (_fn.userTouchMove) {
+				if (datas.mx != 0 && datas.my != 0) {
+					var disX = touches[0].pageX - datas.mx,
+						disY = touches[0].pageXY - datas.my;
+					_fn.userTouchMove(touches[0].pageX, touches[0].pageY, disX, disY);
+				}
+				datas.mx = touches[0].pageX;
+				datas.my = touches[0].pageY;
+			}
+			datas.isScrolling = false;
 		},
 		touchend : function(event) {
 			if (datas.preventDefault) { event.preventDefault(); }
@@ -144,6 +167,8 @@ var BeScroll = function() {
 				_fn.slideDown && _fn.slideDown();
 			} else if (distanceY <= -100) {   //上滑
 				_fn.slideUp && _fn.slideUp();
+			} else {
+				_fn.noSlide && _fn.noSlide();
 			}
 			datas.slideDreaction = distanceY > 0 ? 1 : -1;   //判断滚动方向，上or下
 			datas.slideSpeed = Math.round(17*distanceY/(endTime - datas.startTime));  //计算手指滑动速度，单位：px/17ms
@@ -202,8 +227,10 @@ var BeScroll = function() {
 			(params.slideDown && typeof params.slideDown == 'function') ? _fn.slideDown = params.slideDown : null;
 			(params.slideLeft && typeof params.slideLeft == 'function') ? _fn.slideLeft = params.slideLeft : null;
 			(params.slideRight && typeof params.slideRight == 'function') ? _fn.slideRight = params.slideRight : null;
+			(params.noSlide && typeof params.noSlide == 'function') ? _fn.noSlide = params.noSlide : null;
 			(params.click && typeof params.click) == 'function' ? _fn.click = params.click : null;
 			(params.longClick && typeof params.longClick == 'function') ? _fn.longClick = params.longClick : null;
+			(params.touchmove && typeof params.touchmove == 'function') ? _fn.userTouchMove = params.touchmove : null;
 			/* 初始化用户事件 end */
 		}
 		datas.scroller.parentElement.style.overflow = 'hidden';
