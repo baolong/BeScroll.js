@@ -1,7 +1,7 @@
 /**
   * 参数：
   *		bescroll: 是否开启模拟滚动，默认：false
-  *		scrollBar: 是否打开滚动条，默认：true
+  *		enableScrollBar: 是否打开滚动条，默认：true
   *		barColor: 滚动条颜色，默认：#ff8200
   *		slideUp(): 手指上滑处理事件
   *		slideDown(): 手指下滑处理事件
@@ -12,9 +12,11 @@
   *										curY：当前Y坐标
   *										disX: x轴位移
   *										disY：y轴位移
-  *		noSlide(): 滑动取消事件，滑动位移不足，不触发上/下/左/右滑事件
+  *		noXSlide(): 滑动取消事件，X轴滑动位移不足，不触发左/右滑事件
+  *		noYSlide(): 滑动取消事件，Y轴滑动位移不足，不触发上/下滑事件
   *		click(target): 屏幕点击事件
   *		longClick(target):  长按事件
+  *		reachBottom(): 到达底部事件
   *		toTop():   回到顶部，没有滚动动画
   */
 var BeScroll = function() {
@@ -24,11 +26,11 @@ var BeScroll = function() {
 		y: 0,    //touchstart的y坐标
 		mx: 0,    //touchmove的x坐标
 		my: 0,    //touchmove的xy坐标
-		moveY: 0,
+		lastMoveY: 0,  //上一次的Y坐标
 		hands: 0,  //手指数
 		preventDefault: true,
 		bescroll: false,   //是否开启模拟滚动
-		scrollBar: true,   //是否开启滚动条
+		enableScrollBar: true,   //是否开启滚动条
 		barColor: '#ff8200',   //滚动条颜色
 		curTop: 0, //滚动条当前位置的高度
 		maxTop: 0,  //滚动条位置的最大高度
@@ -39,10 +41,11 @@ var BeScroll = function() {
 		request: null,    //requestAnimationFrame 对象
 		scrollerHeight: 0,
 		parentHeight: 0,
-		maxHeight: 0,   //页面最大高度
+		maxScrollerMarginTop: 0,   //滚动条的最大margintop
 		lock: false,   //初始化滚动条的互斥锁
 		hands: 0,
-		isScrolling: false
+		isScrolling: false,
+		lastMarginTop: 0
 	}, _fn = {
 		initRAF : function() {
 			/* 功能：初始化requestAnimationFrame 
@@ -66,18 +69,29 @@ var BeScroll = function() {
 		},
 		bescroll : function(y) {
 			/* 模拟滚动 */
-			if (datas.scrollTarget) {
-				datas.scrollTarget.scrollTop = parseInt(datas.scrollTarget.scrollTop) + (y - datas.moveY)*-1;
-			} else {
-				var marginTop = parseInt(datas.scroller.style.marginTop);
+			if (datas.scrollTarget) {   //若目标元素可滚动，则滚动目标元素
+				datas.scrollTarget.scrollTop = parseInt(datas.scrollTarget.scrollTop) + (y - datas.lastMoveY)*-1;
+			} else {   //否则滚动 scroller
+				var marginTop = parseInt(datas.scroller.style.marginTop),
+					lastMarginTop = 0,
+					distance = y - datas.lastMoveY;
 				marginTop = marginTop?marginTop:0;
-				marginTop = marginTop + (y - datas.moveY);
-				if (marginTop < 0 && marginTop > -1*datas.maxHeight) {
-					datas.scroller.style.marginTop = marginTop + "px";
-					datas.scrollBar.style.top = (-1*datas.parentHeight*marginTop/datas.scrollerHeight) + 'px';
+				lastMarginTop = marginTop;
+				if (marginTop + distance < datas.maxScrollerMarginTop) {
+					marginTop = datas.maxScrollerMarginTop;
+				} else {
+					marginTop = marginTop + distance;
+				}
+				if (distance > 0 && marginTop > 0) {
+					marginTop = 0;
+				}
+				datas.scroller.style.marginTop = marginTop + "px";
+				datas.scrollBar.style.top = (-1*datas.parentHeight*marginTop/datas.scrollerHeight) + 'px';
+				if (marginTop == datas.maxScrollerMarginTop && lastMarginTop > marginTop) {
+					_fn.reachBottom && _fn.reachBottom();
 				}
 			}
-			datas.moveY = y;
+			datas.lastMoveY = y;
 		},
 		inertialGuidance : function() {
 			/* 惯性导航 */
@@ -97,7 +111,7 @@ var BeScroll = function() {
 				var marginTop = parseInt(datas.scroller.style.marginTop);
 				marginTop = marginTop?marginTop:0;
 				marginTop += datas.slideSpeed*datas.slideDreaction;
-				if (marginTop < 0 && marginTop > -1*datas.maxHeight) {
+				if (marginTop < 0 && marginTop > datas.maxScrollerMarginTop) {
 					datas.scroller.style.marginTop = marginTop + "px";
 					datas.scrollBar.style.top = (-1*datas.parentHeight*marginTop/datas.scrollerHeight) + 'px';
 					if (datas.slideSpeed > 0) {
@@ -117,9 +131,21 @@ var BeScroll = function() {
 				target = target.parentElement;
 			}while(target);
 		},
+		isFrom : function(tag) {
+			//判断目标元素是否未表单
+			if (tag == "INPUT" || tag == "TEXTAREA") {
+				return true;
+			} else {
+				return false;
+			}
+		},
 		touchstart : function(event) {
+			if (_fn.isFrom(event.target.tagName)) return; //若目标元素为表单，则按默认事件处理
 			if (datas.preventDefault) { event.preventDefault(); }
-			datas.maxHeight = parseInt(datas.scroller.clientHeight) - parseInt(datas.scroller.parentElement.clientHeight);
+			datas.maxScrollerMarginTop = -1*(parseInt(datas.scroller.clientHeight) - parseInt(datas.scroller.parentElement.clientHeight));
+			if (datas.maxScrollerMarginTop > 0) {
+				datas.maxScrollerMarginTop = 0;
+			}
 			var d = new Date();
 			datas.startTime = d.getTime();  //获取滑动开始时间
 			touchesstart  = event.changedTouches || event.originalEvent.touches || event.originalEvent.changedTouches;
@@ -127,10 +153,11 @@ var BeScroll = function() {
 			datas.y = touchesstart[0].pageY;
 			datas.mx = touchesstart[0].pageX;
 			datas.my = touchesstart[0].pageY;
-			datas.moveY = datas.y;
+			datas.lastMoveY = datas.y;
 			_fn.getScrollTarget(event.target);
 		},
 		touchmove : function(event) {
+			if (_fn.isFrom(event.target.tagName)) return; //若目标元素为表单，则按默认事件处理
 			if (datas.isScrolling) return;
 			datas.isScrolling = true;
 			if (datas.preventDefault) { event.preventDefault(); }
@@ -151,6 +178,7 @@ var BeScroll = function() {
 			datas.isScrolling = false;
 		},
 		touchend : function(event) {
+			if (_fn.isFrom(event.target.tagName)) return; //若目标元素为表单，则按默认事件处理
 			if (datas.preventDefault) { event.preventDefault(); }
 			var d = new Date();
 			var endTime = d.getTime(), //滑动结束时间
@@ -163,12 +191,16 @@ var BeScroll = function() {
 				_fn.slideRight && _fn.slideRight();
 			} else if (distanceX <= -100) {   //左滑
 				_fn.slideLeft && _fn.slideLeft();
-			} else if (distanceY >= 100) {   //下滑
+			} else {
+				_fn.noXSlide && _fn.noXSlide();
+			}
+
+			if (distanceY >= 100) {   //下滑
 				_fn.slideDown && _fn.slideDown();
 			} else if (distanceY <= -100) {   //上滑
 				_fn.slideUp && _fn.slideUp();
 			} else {
-				_fn.noSlide && _fn.noSlide();
+				_fn.noYSlide && _fn.noYSlide();
 			}
 			datas.slideDreaction = distanceY > 0 ? 1 : -1;   //判断滚动方向，上or下
 			datas.slideSpeed = Math.round(17*distanceY/(endTime - datas.startTime));  //计算手指滑动速度，单位：px/17ms
@@ -187,13 +219,21 @@ var BeScroll = function() {
 			datas.x = datas.y = 0;
 		},
 		initScrollBar : function() {
-			//初始化初始化
-			if (!datas.lock) {
+			//初始化滚动条
+			if (!datas.lock && datas.scrollBar) {
 				datas.lock = true;
 				datas.parentHeight = parseInt(datas.scroller.parentElement.clientHeight);
 				datas.scrollerHeight = parseInt(datas.scroller.clientHeight);
-				datas.lock = false;
-				var scrollHeight = datas.parentHeight*datas.parentHeight/datas.scrollerHeight;
+				datas.maxScrollerMarginTop = -1*(datas.scrollerHeight - datas.parentHeight);
+				if (datas.maxScrollerMarginTop > 0) {
+					datas.maxScrollerMarginTop = 0;
+				}
+				var scrollHeight = datas.parentHeight*datas.parentHeight/datas.scrollerHeight,
+					marginTop = parseInt(datas.scroller.style.marginTop);
+				marginTop = marginTop?marginTop:0;
+				if (marginTop <= datas.maxScrollerMarginTop) {
+					datas.scroller.style.marginTop = datas.maxScrollerMarginTop + "px";
+				}
 				if (scrollHeight < datas.parentHeight) {
 					var style = {
 							width: '5px',
@@ -201,7 +241,7 @@ var BeScroll = function() {
 							background: datas.barColor,
 							position: 'fixed',
 							right: '0',
-							top: '0',
+							top: (-1*datas.parentHeight*marginTop/datas.scrollerHeight) + "px",
 							'z-index': 99999
 						};
 					datas.scrollBar.setAttribute('class', 'BeScroll-scrollBar');
@@ -210,8 +250,10 @@ var BeScroll = function() {
 					}
 					datas.scrollBar.style.display = 'block';
 				} else {
+					_toTop();
 					datas.scrollBar.style.display = 'none';
 				}
+				datas.lock = false;
 			}
 		}
 	}, _toTop = function() {
@@ -221,16 +263,18 @@ var BeScroll = function() {
 		if (params) {
 			/* 初始化用户事件 start */
 			datas.bescroll = params.bescroll ? params.bescroll : null;
-			datas.scrollBar = params.scrollBar ? params.scrollBar : true;
+			datas.enableScrollBar = params.enableScrollBar ? params.enableScrollBar : true;
 			datas.barColor = params.barColor ? params.barColor : datas.barColor;
 			(params.slideUp && typeof params.slideUp == 'function') ? _fn.slideUp = params.slideUp : null;
 			(params.slideDown && typeof params.slideDown == 'function') ? _fn.slideDown = params.slideDown : null;
 			(params.slideLeft && typeof params.slideLeft == 'function') ? _fn.slideLeft = params.slideLeft : null;
 			(params.slideRight && typeof params.slideRight == 'function') ? _fn.slideRight = params.slideRight : null;
-			(params.noSlide && typeof params.noSlide == 'function') ? _fn.noSlide = params.noSlide : null;
+			(params.noXSlide && typeof params.noXSlide == 'function') ? _fn.noXSlide = params.noXSlide : null;
+			(params.noYSlide && typeof params.noYSlide == 'function') ? _fn.noYSlide = params.noYSlide : null;
 			(params.click && typeof params.click) == 'function' ? _fn.click = params.click : null;
 			(params.longClick && typeof params.longClick == 'function') ? _fn.longClick = params.longClick : null;
 			(params.touchmove && typeof params.touchmove == 'function') ? _fn.userTouchMove = params.touchmove : null;
+			(params.reachBottom && typeof params.reachBottom == 'function') ? _fn.reachBottom = params.reachBottom : null;
 			/* 初始化用户事件 end */
 		}
 		datas.scroller.parentElement.style.overflow = 'hidden';
@@ -239,13 +283,13 @@ var BeScroll = function() {
 		datas.scroller.parentElement.style.position = 'relative';
 		datas.scrollerHeight = parseInt(datas.scroller.clientHeight);
 		datas.parentHeight = parseInt(datas.scroller.parentElement.clientHeight);
-		datas.maxHeight = datas.scrollerHeight - datas.parentHeight;
+		datas.maxScrollerMarginTop = -1*(datas.scrollerHeight - datas.parentHeight);
 		_fn.initRAF();
 		document.addEventListener('touchstart', _fn.touchstart);
 		document.addEventListener('touchmove', _fn.touchmove);
 		document.addEventListener('touchend', _fn.touchend);
 		/* 初始化滚动条 start */
-		if (datas.scrollBar) {
+		if (datas.enableScrollBar) {
 			datas.scrollBar = document.createElement('div');
 			/* 当页面内有变化，则重新初始化滚动条 start */
 			document.addEventListener("DOMNodeInserted", function (ev) {
@@ -261,6 +305,7 @@ var BeScroll = function() {
 		/* 初始化滚动条 end */
 	};
 	return {
+		resetScrollBar: _fn.initScrollBar,
 		toTop: _toTop,
 		init: _init
 	};
